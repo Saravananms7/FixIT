@@ -50,6 +50,7 @@ const getIssues = asyncHandler(async (req, res) => {
     priority,
     postedBy,
     assignedTo,
+    excludePostedBy,
     page = 1,
     limit = 10,
     sortBy = 'createdAt',
@@ -63,6 +64,11 @@ const getIssues = asyncHandler(async (req, res) => {
   if (priority) filter.priority = priority;
   if (postedBy) filter.postedBy = postedBy;
   if (assignedTo) filter.assignedTo = assignedTo;
+  
+  // Exclude current user's issues from "All Issues" page
+  if (excludePostedBy) {
+    filter.postedBy = { $ne: excludePostedBy };
+  }
 
   // Build sort object
   const sort = {};

@@ -20,8 +20,9 @@ router.use(protect);
 router.route('/')
   .get(getUsers);
 
-router.route('/:id')
-  .get(getUser);
+// Statistics and analytics (specific routes first)
+router.get('/top-contributors', getTopContributors);
+router.get('/search/skills', searchUsersBySkills);
 
 // User issues
 router.get('/:id/issues', getUserIssues);
@@ -32,7 +33,9 @@ router.put('/:id/skills/:skillName/verify', verifyUserSkill);
 
 // Statistics and analytics
 router.get('/:id/stats', getUserStats);
-router.get('/top-contributors', getTopContributors);
-router.get('/search/skills', searchUsersBySkills);
+
+// User by ID (parameterized routes last)
+router.route('/:id')
+  .get(getUser);
 
 module.exports = router; 
