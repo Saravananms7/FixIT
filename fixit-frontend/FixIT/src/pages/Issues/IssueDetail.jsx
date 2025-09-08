@@ -119,21 +119,21 @@ const IssueDetail = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-7xl mx-auto space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <Link to="/issues" className="btn btn-secondary btn-sm">
+      <div className="flex items-start justify-between mb-6">
+        <div className="flex items-start space-x-4">
+          <Link to="/issues" className="btn btn-secondary btn-sm mt-1">
             <ArrowLeft size={16} className="mr-2" />
             Back
           </Link>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">{issue.title}</h1>
-            <p className="text-gray-600">Issue Details</p>
+          <div className="flex-1">
+            <h1 className="text-3xl font-bold text-gray-900 leading-tight">{issue.title}</h1>
+            <p className="text-gray-500 mt-1">Issue Details</p>
           </div>
         </div>
         
-        <div className="flex space-x-2">
+        <div className="flex space-x-3">
           {canEditIssue() && (
             <Link
               to={`/issues/${issue._id}/edit`}
@@ -169,32 +169,39 @@ const IssueDetail = () => {
         <div className="lg:col-span-2 space-y-6">
           {/* Description */}
           <div className="card p-6">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Description</h3>
-            <p className="text-gray-700 whitespace-pre-wrap">{issue.description}</p>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Description</h3>
+            <div className="prose prose-sm max-w-none">
+              <p className="text-gray-700 whitespace-pre-wrap leading-relaxed">{issue.description}</p>
+            </div>
           </div>
 
           {/* Comments Section */}
           <div className="card p-6">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Comments</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Comments</h3>
             {issue.comments && issue.comments.length > 0 ? (
               <div className="space-y-4">
                 {issue.comments.map((comment, index) => (
-                  <div key={index} className="border-l-4 border-primary-200 pl-4">
+                  <div key={index} className="border-l-4 border-primary-200 pl-4 py-2">
                     <div className="flex items-center space-x-2 mb-2">
-                      <User size={16} className="text-gray-500" />
-                      <span className="text-sm font-medium text-gray-900">
+                      <div className="w-6 h-6 bg-primary-100 rounded-full flex items-center justify-center">
+                        <User size={12} className="text-primary-600" />
+                      </div>
+                      <span className="text-sm font-semibold text-gray-900">
                         {comment.postedBy?.firstName} {comment.postedBy?.lastName}
                       </span>
-                      <span className="text-sm text-gray-500">
+                      <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
                         {formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true })}
                       </span>
                     </div>
-                    <p className="text-gray-700">{comment.content}</p>
+                    <p className="text-gray-700 text-sm leading-relaxed">{comment.content}</p>
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="text-gray-500">No comments yet.</p>
+              <div className="text-center py-8">
+                <MessageSquare className="mx-auto h-8 w-8 text-gray-300 mb-2" />
+                <p className="text-gray-500 text-sm">No comments yet.</p>
+              </div>
             )}
           </div>
         </div>
@@ -203,44 +210,48 @@ const IssueDetail = () => {
         <div className="space-y-6">
           {/* Status and Priority */}
           <div className="card p-6">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Status & Priority</h3>
-            <div className="space-y-3">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Status & Priority</h3>
+            <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-gray-700">Status:</span>
-                <span className={`badge ${getStatusColor(issue.status)}`}>
+                <span className="text-sm font-medium text-gray-600">Status</span>
+                <span className={`badge ${getStatusColor(issue.status)} text-xs font-semibold px-3 py-1`}>
                   {getStatusText(issue.status)}
                 </span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-gray-700">Priority:</span>
-                <span className={`badge ${getPriorityColor(issue.priority)}`}>
+                <span className="text-sm font-medium text-gray-600">Priority</span>
+                <span className={`badge ${getPriorityColor(issue.priority)} text-xs font-semibold px-3 py-1`}>
                   {issue.priority}
                 </span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-gray-700">Category:</span>
-                <span className="text-sm text-gray-900 capitalize">{issue.category}</span>
+                <span className="text-sm font-medium text-gray-600">Category</span>
+                <span className="text-sm text-gray-900 capitalize font-medium">{issue.category}</span>
               </div>
             </div>
           </div>
 
           {/* Issue Info */}
           <div className="card p-6">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Issue Information</h3>
-            <div className="space-y-3">
-              <div className="flex items-center space-x-2">
-                <User size={16} className="text-gray-500" />
-                <div>
-                  <p className="text-sm font-medium text-gray-900">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Issue Information</h3>
+            <div className="space-y-4">
+              <div className="flex items-start space-x-3">
+                <div className="w-8 h-8 bg-primary-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <User size={14} className="text-primary-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-gray-900">
                     {issue.postedBy?.firstName} {issue.postedBy?.lastName}
                   </p>
                   <p className="text-xs text-gray-500">{issue.postedBy?.employeeId}</p>
                 </div>
               </div>
               
-              <div className="flex items-center space-x-2">
-                <Clock size={16} className="text-gray-500" />
-                <div>
+              <div className="flex items-start space-x-3">
+                <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <Clock size={14} className="text-gray-600" />
+                </div>
+                <div className="flex-1 min-w-0">
                   <p className="text-sm text-gray-900">
                     Created {formatDistanceToNow(new Date(issue.createdAt), { addSuffix: true })}
                   </p>
@@ -253,10 +264,12 @@ const IssueDetail = () => {
               </div>
 
               {issue.assignedTo && (
-                <div className="flex items-center space-x-2">
-                  <User size={16} className="text-gray-500" />
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">
+                <div className="flex items-start space-x-3">
+                  <div className="w-8 h-8 bg-success-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <User size={14} className="text-success-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-gray-900">
                       Assigned to {issue.assignedTo.firstName} {issue.assignedTo.lastName}
                     </p>
                     <p className="text-xs text-gray-500">{issue.assignedTo.employeeId}</p>
@@ -269,10 +282,10 @@ const IssueDetail = () => {
           {/* Required Skills */}
           {issue.requiredSkills && issue.requiredSkills.length > 0 && (
             <div className="card p-6">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Required Skills</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Required Skills</h3>
               <div className="flex flex-wrap gap-2">
                 {issue.requiredSkills.map((skill, index) => (
-                  <span key={index} className="badge badge-primary">
+                  <span key={index} className="badge badge-primary text-xs font-medium px-3 py-1">
                     {skill}
                   </span>
                 ))}
@@ -283,10 +296,10 @@ const IssueDetail = () => {
           {/* Tags */}
           {issue.tags && issue.tags.length > 0 && (
             <div className="card p-6">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Tags</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Tags</h3>
               <div className="flex flex-wrap gap-2">
                 {issue.tags.map((tag, index) => (
-                  <span key={index} className="badge badge-secondary">
+                  <span key={index} className="badge badge-secondary text-xs font-medium px-3 py-1">
                     <Tag size={12} className="mr-1" />
                     {tag}
                   </span>
@@ -298,22 +311,25 @@ const IssueDetail = () => {
           {/* Location */}
           {issue.location && (issue.location.building || issue.location.floor || issue.location.room) && (
             <div className="card p-6">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Location</h3>
-              <div className="space-y-2">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Location</h3>
+              <div className="space-y-3">
                 {issue.location.building && (
-                  <p className="text-sm text-gray-700">
-                    <span className="font-medium">Building:</span> {issue.location.building}
-                  </p>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-600">Building</span>
+                    <span className="text-sm text-gray-900 font-medium">{issue.location.building}</span>
+                  </div>
                 )}
                 {issue.location.floor && (
-                  <p className="text-sm text-gray-700">
-                    <span className="font-medium">Floor:</span> {issue.location.floor}
-                  </p>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-600">Floor</span>
+                    <span className="text-sm text-gray-900 font-medium">{issue.location.floor}</span>
+                  </div>
                 )}
                 {issue.location.room && (
-                  <p className="text-sm text-gray-700">
-                    <span className="font-medium">Room:</span> {issue.location.room}
-                  </p>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-600">Room</span>
+                    <span className="text-sm text-gray-900 font-medium">{issue.location.room}</span>
+                  </div>
                 )}
               </div>
             </div>
