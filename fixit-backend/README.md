@@ -1,6 +1,6 @@
 # FixIT Backend
 
-An AI-powered internal support mobile app backend built with Node.js, Express, MongoDB, and Socket.io. Designed for large organizations to enable collaborative problem-solving and eliminate confusion during technical difficulties.
+An AI-powered internal support platform backend built with Node.js, Express, MongoDB, and Socket.io. Designed for large organizations to enable collaborative problem-solving and eliminate confusion during technical difficulties.
 
 ## 🚀 Features
 
