@@ -38,13 +38,13 @@ const DashboardLayout = () => {
       {/* Mobile sidebar overlay */}
       {sidebarOpen && (
         <div 
-          className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm lg:hidden"
+          className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm"
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
       {/* Sidebar */}
-      <div className={`fixed inset-y-0 left-0 z-50 w-72 bg-gradient-to-b from-white to-gray-50 shadow-2xl transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0 ${
+      <div className={`fixed inset-y-0 left-0 z-50 w-72 bg-gradient-to-b from-white to-gray-50 shadow-2xl transform transition-transform duration-300 ease-in-out ${
         sidebarOpen ? 'translate-x-0' : '-translate-x-full'
       }`}>
         <div className="flex items-center justify-between h-20 px-8 border-b border-gray-200/50">
@@ -117,14 +117,15 @@ const DashboardLayout = () => {
       </div>
 
       {/* Main content */}
-      <div className="lg:pl-72 relative">
+      {/* Remove bottom-28 and p to reduce the gap */}
+      <div className="relative">
         {/* Header */}
         <header className="glass-effect border-b border-gray-200/50">
           <div className="flex items-center justify-between h-20 px-6 lg:px-8">
             <div className="flex items-center">
               <button
                 onClick={() => setSidebarOpen(true)}
-                className="lg:hidden p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors mr-4"
+                className="p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors mr-4"
               >
                 <Menu size={20} />
               </button>
@@ -174,7 +175,7 @@ const DashboardLayout = () => {
         </header>
 
         {/* Page content */}
-        <main className="p-6 lg:p-8 min-h-screen">
+        <main className="p-4 lg:p-6 min-h-screen">
           <div className="fade-in max-w-full">
             <Outlet />
           </div>
