@@ -8,20 +8,29 @@ import {
   Clock, 
   AlertTriangle,
   MessageSquare,
-  Tag
+  Tag,
+  Send
 } from 'lucide-react';
 import { issuesAPI } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { formatDistanceToNow } from 'date-fns';
 import toast from 'react-hot-toast';
+import { useSocket } from '../../contexts/SocketContext';
 
 const IssueDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { socket } = useSocket();
   const [issue, setIssue] = useState(null);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
+  const [commentContent, setCommentContent] = useState('');
+  const [addingComment, setAddingComment] = useState(false);
+  const [helpersLoading, setHelpersLoading] = useState(false);
+  const [helpers, setHelpers] = useState([]);
+  const [assigningTo, setAssigningTo] = useState(null);
+  const [offering, setOffering] = useState(false);
 
   useEffect(() => {
     fetchIssue();
@@ -37,6 +46,66 @@ const IssueDetail = () => {
       toast.error('Failed to load issue');
     } finally {
       setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!issue) return;
+    // Only load helper suggestions if user is the submitter and issue is not closed
+    if (user?._id === issue?.postedBy?._id && !['resolved','closed'].includes(issue.status)) {
+      void fetchHelperSuggestions();
+    }
+  }, [issue, user]);
+
+  const fetchHelperSuggestions = async () => {
+    try {
+      setHelpersLoading(true);
+      const response = await issuesAPI.getHelperSuggestions(id);
+      const list = response.data?.data?.helpers || [];
+      setHelpers(list);
+    } catch (error) {
+      console.error('Error fetching helpers:', error);
+    } finally {
+      setHelpersLoading(false);
+    }
+  };
+
+  const handleAssign = async (helperId) => {
+    try {
+      setAssigningTo(helperId);
+      await issuesAPI.assign(id, helperId);
+      toast.success('Issue assigned');
+      await fetchIssue();
+    } catch (error) {
+      console.error('Error assigning issue:', error);
+      const errorMessage = error.response?.data?.message || 'Failed to assign';
+      toast.error(errorMessage);
+    } finally {
+      setAssigningTo(null);
+    }
+  };
+
+  const handleAddComment = async (e) => {
+    e.preventDefault();
+    const content = commentContent.trim();
+    if (!content) return;
+
+    try {
+      setAddingComment(true);
+      const response = await issuesAPI.addComment(id, { content });
+      const newComment = response.data.data;
+      setIssue((prev) => ({
+        ...prev,
+        comments: [...(prev?.comments || []), newComment]
+      }));
+      setCommentContent('');
+      toast.success('Comment added');
+    } catch (error) {
+      console.error('Error adding comment:', error);
+      const errorMessage = error.response?.data?.message || 'Failed to add comment';
+      toast.error(errorMessage);
+    } finally {
+      setAddingComment(false);
     }
   };
 
@@ -93,6 +162,9 @@ const IssueDetail = () => {
   const getStatusText = (status) => {
     return status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
   };
+
+  const isOwner = user?._id === issue?.postedBy?._id;
+  const isAssignedToMe = user?._id && issue?.assignedTo?._id === user._id;
 
   if (loading) {
     return (
@@ -178,6 +250,37 @@ const IssueDetail = () => {
           {/* Comments Section */}
           <div className="card p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Comments</h3>
+            {/* Add comment form */}
+            <form onSubmit={handleAddComment} className="mb-4">
+              <div className="flex items-start space-x-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-primary-100 to-primary-200 rounded-xl flex items-center justify-center shadow-sm flex-shrink-0">
+                  <User size={16} className="text-primary-600" />
+                </div>
+                <div className="flex-1">
+                  <textarea
+                    value={commentContent}
+                    onChange={(e) => setCommentContent(e.target.value)}
+                    placeholder="Write a comment..."
+                    className="input min-h-[44px] h-11 resize-y"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={addingComment || !commentContent.trim()}
+                  className="btn btn-primary btn-md flex-shrink-0"
+                  title="Add comment"
+                >
+                  {addingComment ? (
+                    <div className="loading-spinner w-4 h-4"></div>
+                  ) : (
+                    <>
+                      <Send size={16} className="mr-2" />
+                      Comment
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
             {issue.comments && issue.comments.length > 0 ? (
               <div className="space-y-4">
                 {issue.comments.map((comment, index) => (
@@ -187,7 +290,7 @@ const IssueDetail = () => {
                         <User size={12} className="text-primary-600" />
                       </div>
                       <span className="text-sm font-semibold text-gray-900">
-                        {comment.postedBy?.firstName} {comment.postedBy?.lastName}
+                        {(comment.user?.firstName || comment.postedBy?.firstName) || 'User'} {(comment.user?.lastName || comment.postedBy?.lastName) || ''}
                       </span>
                       <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
                         {formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true })}
@@ -208,6 +311,106 @@ const IssueDetail = () => {
 
         {/* Sidebar */}
         <div className="space-y-6">
+          {/* Offer to help (for non-owners) */}
+          {!isOwner && !isAssignedToMe && !['resolved','closed'].includes(issue.status) && (
+            <div className="card p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-3">Offer to Help</h3>
+              <p className="text-sm text-gray-600 mb-3">Let the reporter know you're available to assist.</p>
+              <button
+                onClick={async () => {
+                  try {
+                    setOffering(true);
+                    // Emit real-time help offer to the reporter
+                    if (socket && issue?.postedBy?._id) {
+                      socket.emit('message:send', {
+                        recipientId: issue.postedBy._id,
+                        message: "I'd like to help on this issue.",
+                        issueId: issue._id,
+                      });
+                      toast.success('Offer sent');
+                    } else {
+                      toast.error('Not connected. Please try again.');
+                    }
+                  } catch (error) {
+                    const msg = error.response?.data?.message || 'Failed to send offer';
+                    toast.error(msg);
+                  } finally {
+                    setOffering(false);
+                  }
+                }}
+                disabled={offering}
+                className="btn btn-primary btn-md"
+              >
+                {offering ? 'Sending...' : 'Offer to Help'}
+              </button>
+            </div>
+          )}
+
+          {/* Recommended Helpers (for owner) */}
+          {user?._id === issue?.postedBy?._id && (
+            <div className="card p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Recommended Helpers</h3>
+              {helpersLoading ? (
+                <div className="flex items-center justify-center py-6"><div className="loading-spinner w-6 h-6"></div></div>
+              ) : helpers.length > 0 ? (
+                <div className="space-y-3">
+                  {/* Best match */}
+                  <div className="p-4 rounded-xl bg-gradient-to-r from-primary-50 to-white border border-primary-100">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center">
+                        <div className="w-10 h-10 bg-gradient-to-br from-primary-100 to-primary-200 rounded-xl flex items-center justify-center shadow-sm">
+                          <span className="text-sm font-semibold text-primary-600">{helpers[0].firstName?.charAt(0)}</span>
+                        </div>
+                        <div className="ml-3">
+                          <p className="text-sm font-semibold text-gray-900">{helpers[0].firstName} {helpers[0].lastName}</p>
+                          <p className="text-xs text-gray-600">{helpers[0].department || '—'} • Score {(helpers[0].helperScore ?? 0).toFixed(2)}</p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleAssign(helpers[0]._id)}
+                        disabled={assigningTo === helpers[0]._id}
+                        className="btn btn-primary btn-sm"
+                      >
+                        {assigningTo === helpers[0]._id ? 'Assigning...' : 'Assign'}
+                      </button>
+                    </div>
+                    {/* Matching skills */}
+                    {issue.requiredSkills?.length > 0 && (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {issue.requiredSkills.slice(0, 4).map((s, i) => (
+                          <span key={i} className="badge badge-primary text-[10px] px-2 py-0.5">{s}</span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Other candidates */}
+                  {helpers.slice(1, 4).map((h) => (
+                    <div key={h._id} className="flex items-center justify-between p-3 rounded-lg border">
+                      <div className="flex items-center">
+                        <div className="w-9 h-9 bg-gray-100 rounded-lg flex items-center justify-center">
+                          <span className="text-xs font-semibold text-gray-600">{h.firstName?.charAt(0)}</span>
+                        </div>
+                        <div className="ml-3">
+                          <p className="text-sm font-medium text-gray-900">{h.firstName} {h.lastName}</p>
+                          <p className="text-xs text-gray-500">Score {(h.helperScore ?? 0).toFixed(2)}</p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleAssign(h._id)}
+                        disabled={assigningTo === h._id}
+                        className="btn btn-secondary btn-sm"
+                      >
+                        {assigningTo === h._id ? 'Assigning...' : 'Assign'}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500">No recommendations available.</p>
+              )}
+            </div>
+          )}
           {/* Status and Priority */}
           <div className="card p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Status & Priority</h3>

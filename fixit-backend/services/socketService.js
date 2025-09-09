@@ -205,7 +205,7 @@ class SocketService {
   }
 
   handlePrivateMessage(socket, data) {
-    const { recipientId, message } = data;
+    const { recipientId, message, issueId } = data;
     
     // Send to recipient
     this.io.to(`user:${recipientId}`).emit('message:received', {
@@ -215,6 +215,7 @@ class SocketService {
         employeeId: socket.user.employeeId
       },
       message,
+      issueId,
       timestamp: new Date()
     });
 
@@ -222,6 +223,7 @@ class SocketService {
     socket.emit('message:sent', {
       recipientId,
       message,
+      issueId,
       timestamp: new Date()
     });
   }

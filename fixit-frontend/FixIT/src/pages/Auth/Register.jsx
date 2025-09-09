@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, Mail, Lock, User, Building, Phone } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, User, Building, Phone, IdCard } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
 const Register = () => {
   const [formData, setFormData] = useState({
+    employeeId: '',
     firstName: '',
     lastName: '',
     email: '',
@@ -53,6 +54,9 @@ const Register = () => {
   };
 
   const validateForm = () => {
+    if (!formData.employeeId || formData.employeeId.trim().length < 3) {
+      return 'Employee ID is required (min 3 characters)';
+    }
     if (formData.password !== formData.confirmPassword) {
       return 'Passwords do not match';
     }
@@ -109,6 +113,28 @@ const Register = () => {
         
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           <div className="space-y-4">
+            {/* Employee ID */}
+            <div>
+              <label htmlFor="employeeId" className="block text-sm font-medium text-gray-700">
+                Employee ID
+              </label>
+              <div className="mt-1 relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <IdCard className="h-5 w-5 text-gray-400" />
+                </div>
+                <input
+                  id="employeeId"
+                  name="employeeId"
+                  type="text"
+                  required
+                  value={formData.employeeId}
+                  onChange={handleChange}
+                  className="input pl-10"
+                  placeholder="EMP-00123"
+                />
+              </div>
+            </div>
+
             {/* Name Fields */}
             <div className="grid grid-cols-2 gap-4">
               <div>

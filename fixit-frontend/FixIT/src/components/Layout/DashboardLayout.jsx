@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useLocation, Outlet } from 'react-router-dom';
 import { 
   Home, 
@@ -17,10 +17,17 @@ import {
   FileText
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useNotifications } from '../../contexts/NotificationsContext';
+import { issuesAPI } from '../../services/api';
 
 const DashboardLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { user, logout } = useAuth();
+  const { notifications, unread, markAllRead } = useNotifications();
+  const [showNotif, setShowNotif] = useState(false);
+  const [selectedNotif, setSelectedNotif] = useState(null);
+  const [selectedIssue, setSelectedIssue] = useState(null);
+  const [loadingIssue, setLoadingIssue] = useState(false);
   const location = useLocation();
 
   const navigation = [
@@ -32,6 +39,26 @@ const DashboardLayout = () => {
   ];
 
   const isActive = (path) => location.pathname === path;
+
+  // Load issue details when a notification with issueId is opened
+  useEffect(() => {
+    const loadIssue = async () => {
+      if (!selectedNotif?.data?.issueId) {
+        setSelectedIssue(null);
+        return;
+      }
+      try {
+        setLoadingIssue(true);
+        const res = await issuesAPI.getById(selectedNotif.data.issueId);
+        setSelectedIssue(res.data.data);
+      } catch (_) {
+        setSelectedIssue(null);
+      } finally {
+        setLoadingIssue(false);
+      }
+    };
+    loadIssue();
+  }, [selectedNotif]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 relative">
@@ -120,7 +147,7 @@ const DashboardLayout = () => {
       {/* Remove bottom-28 and p to reduce the gap */}
       <div className="relative">
         {/* Header */}
-        <header className="glass-effect border-b border-gray-200/50">
+        <header className="glass-effect border-b border-gray-200/50 relative z-[200]">
           <div className="flex items-center justify-between h-20 px-6 lg:px-8">
             <div className="flex items-center">
               <button
@@ -129,6 +156,17 @@ const DashboardLayout = () => {
               >
                 <Menu size={20} />
               </button>
+              
+              {/* Inline brand: logo and tagline */}
+              <Link to="/dashboard" className="flex items-center mr-4 hover:opacity-80 transition-opacity">
+                <div className="w-10 h-10 bg-gradient-to-br from-primary-600 to-primary-700 rounded-xl flex items-center justify-center shadow-md">
+                  <span className="text-white font-bold text-lg">F</span>
+                </div>
+                <div className="ml-2 hidden sm:block leading-tight">
+                  <span className="text-base font-bold text-gradient">FixIT</span>
+                  <p className="text-[11px] text-gray-500">Support Platform</p>
+                </div>
+              </Link>
               
               {/* Search bar */}
               <div className="flex-1 max-w-lg">
@@ -154,10 +192,35 @@ const DashboardLayout = () => {
               </Link>
 
               {/* Notifications */}
-              <button className="relative p-3 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all duration-200">
-                <Bell size={20} />
-                <span className="absolute top-2 right-2 w-3 h-3 bg-danger-500 rounded-full pulse-glow"></span>
-              </button>
+              <div className="relative">
+                <button
+                  onClick={() => { setShowNotif((s) => !s); markAllRead(); }}
+                  className="relative p-3 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all duration-200"
+                >
+                  <Bell size={20} />
+                  {unread > 0 && <span className="absolute top-2 right-2 min-w-[14px] h-[14px] px-1 text-[10px] leading-[14px] text-white bg-danger-500 rounded-full text-center">{unread}</span>}
+                </button>
+                {showNotif && (
+                  <div className="absolute right-0 mt-2 w-80 max-h-96 overflow-auto card p-2 z-[400]">
+                    <div className="px-2 py-1 text-xs font-semibold text-gray-500">Notifications</div>
+                    <div className="divide-y">
+                      {notifications.length === 0 ? (
+                        <div className="p-4 text-sm text-gray-500">No notifications</div>
+                      ) : notifications.map((n) => (
+                        <button 
+                          key={n.id} 
+                          className="block w-full text-left p-3 hover:bg-gray-50"
+                          onClick={() => { setSelectedNotif(n); setShowNotif(false); }}
+                        >
+                          <p className="text-sm font-medium text-gray-900">{n.title}</p>
+                          <p className="text-xs text-gray-600">{n.message}</p>
+                          <p className="text-[10px] text-gray-400 mt-1">{new Date(n.createdAt).toLocaleString()}</p>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
 
               {/* User menu */}
               <div className="relative">
@@ -180,6 +243,71 @@ const DashboardLayout = () => {
             <Outlet />
           </div>
         </main>
+
+        {/* Notification detail modal */}
+        {selectedNotif && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/40" onClick={() => setSelectedNotif(null)}></div>
+            <div className="relative w-full max-w-md card p-6 z-[61]">
+              <button 
+                className="absolute top-3 right-3 p-2 rounded-lg hover:bg-gray-100 text-gray-500"
+                onClick={() => setSelectedNotif(null)}
+                aria-label="Close"
+              >
+                <X size={18} />
+              </button>
+              <div className="mb-2 text-xs text-gray-500">{new Date(selectedNotif.createdAt).toLocaleString()}</div>
+              <h3 className="text-lg font-semibold text-gray-900">{selectedNotif.title}</h3>
+              <p className="text-sm text-gray-700 mt-2">{selectedNotif.message}</p>
+
+              {/* Issue reference */}
+              {selectedNotif?.data?.issueId && (
+                <div className="mt-4 p-3 rounded-lg bg-gray-50 border">
+                  <p className="text-xs font-medium text-gray-600">Issue</p>
+                  {loadingIssue ? (
+                    <div className="flex items-center justify-between mt-1">
+                      <span className="text-sm text-gray-500">Loading issue…</span>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="mt-1">
+                        <p className="text-sm font-semibold text-gray-900 truncate">{selectedIssue?.title || `#${selectedNotif.data.issueId}`}</p>
+                        {selectedIssue && (
+                          <div className="mt-1 flex items-center gap-2">
+                            <span className="badge text-xs px-2 py-0.5 bg-gray-100">{selectedIssue.category}</span>
+                            <span className="badge text-xs px-2 py-0.5 bg-gray-100">{selectedIssue.priority}</span>
+                            <span className="badge text-xs px-2 py-0.5 bg-gray-100">{selectedIssue.status?.replace('_',' ')}</span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex items-center justify-between mt-2">
+                        <span className="text-xs text-gray-500">ID: {selectedNotif.data.issueId}</span>
+                        <Link 
+                          to={`/issues/${selectedNotif.data.issueId}`} 
+                          className="btn btn-primary btn-sm"
+                          onClick={() => setSelectedNotif(null)}
+                        >
+                          View issue
+                        </Link>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* Sender details */}
+              {selectedNotif?.data?.sender && (
+                <div className="mt-3 p-3 rounded-lg bg-white border">
+                  <p className="text-xs font-medium text-gray-600">From</p>
+                  <div className="mt-1">
+                    <p className="text-sm font-semibold text-gray-900">{selectedNotif.data.sender.name}</p>
+                    <p className="text-xs text-gray-600">Employee ID: {selectedNotif.data.sender.employeeId || '—'}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

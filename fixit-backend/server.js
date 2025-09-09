@@ -39,9 +39,25 @@ const limiter = rateLimit({
 });
 app.use(limiter);
 
-// CORS configuration with hardcoded values
+// CORS configuration
+const allowedOrigins = [
+  "http://localhost:3000",
+  "http://localhost:5173",
+  "https://your-vercel-app.vercel.app", // Replace with your Vercel domain
+  "https://fixit-app.vercel.app" // Example domain
+];
+
 app.use(cors({
-  origin: "*",
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true
 }));
 
