@@ -9,9 +9,11 @@ import {
   AlertTriangle,
   MessageSquare,
   Tag,
-  Send
+  Send,
+  CheckCircle,
+  Star
 } from 'lucide-react';
-import { issuesAPI } from '../../services/api';
+import { issuesAPI, usersAPI } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { formatDistanceToNow } from 'date-fns';
 import toast from 'react-hot-toast';
@@ -31,6 +33,13 @@ const IssueDetail = () => {
   const [helpers, setHelpers] = useState([]);
   const [assigningTo, setAssigningTo] = useState(null);
   const [offering, setOffering] = useState(false);
+  const [showSolveModal, setShowSolveModal] = useState(false);
+  const [solveData, setSolveData] = useState({
+    solvedBy: '',
+    solution: '',
+    pointsAwarded: 10
+  });
+  const [solving, setSolving] = useState(false);
 
   useEffect(() => {
     fetchIssue();
@@ -61,7 +70,18 @@ const IssueDetail = () => {
     try {
       setHelpersLoading(true);
       const response = await issuesAPI.getHelperSuggestions(id);
-      const list = response.data?.data?.helpers || [];
+      let list = response.data?.data?.helpers || [];
+      
+      // If no helpers found, get all users as fallback
+      if (list.length === 0) {
+        console.log('No helpers found, fetching all users...');
+        const usersResponse = await usersAPI.getAll();
+        list = usersResponse.data?.data || [];
+        // Filter out the current user (issue owner)
+        list = list.filter(user => user._id !== issue?.postedBy?._id);
+      }
+      
+      console.log('Fetched helpers:', list); // Debug log
       setHelpers(list);
     } catch (error) {
       console.error('Error fetching helpers:', error);
@@ -125,6 +145,28 @@ const IssueDetail = () => {
       toast.error(errorMessage);
     } finally {
       setDeleting(false);
+    }
+  };
+
+  const handleMarkAsSolved = async () => {
+    if (!solveData.solvedBy) {
+      toast.error('Please select a solver');
+      return;
+    }
+
+    try {
+      setSolving(true);
+      await issuesAPI.markAsSolved(id, solveData);
+      toast.success('Issue marked as solved! Points awarded to solver.');
+      setShowSolveModal(false);
+      setSolveData({ solvedBy: '', solution: '', pointsAwarded: 10 });
+      await fetchIssue();
+    } catch (error) {
+      console.error('Error marking issue as solved:', error);
+      const errorMessage = error.response?.data?.message || 'Failed to mark as solved';
+      toast.error(errorMessage);
+    } finally {
+      setSolving(false);
     }
   };
 
@@ -247,6 +289,37 @@ const IssueDetail = () => {
             </div>
           </div>
 
+          {/* Solution (if resolved) */}
+          {issue.resolution?.solvedBy && (
+            <div className="card p-6 border-l-4 border-green-500">
+              <div className="flex items-center mb-4">
+                <CheckCircle size={20} className="text-green-600 mr-2" />
+                <h3 className="text-lg font-semibold text-gray-900">Solution</h3>
+              </div>
+              {issue.resolution.solution && issue.resolution.solution.trim() ? (
+                <div className="prose prose-sm max-w-none">
+                  <p className="text-gray-700 whitespace-pre-wrap leading-relaxed">{issue.resolution.solution}</p>
+                </div>
+              ) : (
+                <div className="prose prose-sm max-w-none">
+                  <p className="text-gray-500 italic">No solution description provided</p>
+                </div>
+              )}
+              {issue.resolution.pointsAwarded > 0 && (
+                <div className="mt-4 flex items-center text-sm text-gray-600">
+                  <Star size={16} className="text-yellow-500 mr-1" />
+                  <span>{issue.resolution.pointsAwarded} points awarded</span>
+                </div>
+              )}
+              {issue.resolution.pointsAwarded === 0 && issue.resolution.solvedBy._id === issue.postedBy._id && (
+                <div className="mt-4 flex items-center text-sm text-gray-500">
+                  <CheckCircle size={16} className="text-gray-400 mr-1" />
+                  <span>Solved by issue owner (no points awarded)</span>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Comments Section */}
           <div className="card p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Comments</h3>
@@ -347,7 +420,7 @@ const IssueDetail = () => {
           )}
 
           {/* Recommended Helpers (for owner) */}
-          {user?._id === issue?.postedBy?._id && (
+          {user?._id === issue?.postedBy?._id && !['resolved','closed'].includes(issue.status) && (
             <div className="card p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Recommended Helpers</h3>
               {helpersLoading ? (
@@ -366,13 +439,18 @@ const IssueDetail = () => {
                           <p className="text-xs text-gray-600">{helpers[0].department || '—'} • Score {(helpers[0].helperScore ?? 0).toFixed(2)}</p>
                         </div>
                       </div>
-                      <button
-                        onClick={() => handleAssign(helpers[0]._id)}
-                        disabled={assigningTo === helpers[0]._id}
-                        className="btn btn-primary btn-sm"
-                      >
-                        {assigningTo === helpers[0]._id ? 'Assigning...' : 'Assign'}
-                      </button>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => {
+                            if (!socket) return toast.error('Not connected');
+                            socket.emit('help:ask', { recipientId: helpers[0]._id, issueId: issue._id });
+                            toast.success('Help request sent');
+                          }}
+                          className="btn btn-primary btn-sm"
+                        >
+                          Ask Help
+                        </button>
+                      </div>
                     </div>
                     {/* Matching skills */}
                     {issue.requiredSkills?.length > 0 && (
@@ -396,19 +474,39 @@ const IssueDetail = () => {
                           <p className="text-xs text-gray-500">Score {(h.helperScore ?? 0).toFixed(2)}</p>
                         </div>
                       </div>
-                      <button
-                        onClick={() => handleAssign(h._id)}
-                        disabled={assigningTo === h._id}
-                        className="btn btn-secondary btn-sm"
-                      >
-                        {assigningTo === h._id ? 'Assigning...' : 'Assign'}
-                      </button>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => {
+                            if (!socket) return toast.error('Not connected');
+                            socket.emit('help:ask', { recipientId: h._id, issueId: issue._id });
+                            toast.success('Help request sent');
+                          }}
+                          className="btn btn-secondary btn-sm"
+                        >
+                          Ask Help
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
               ) : (
                 <p className="text-sm text-gray-500">No recommendations available.</p>
               )}
+            </div>
+          )}
+
+          {/* Mark as Solved (for owner) */}
+          {user?._id === issue?.postedBy?._id && !['resolved','closed'].includes(issue.status) && (
+            <div className="card p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-3">Mark as Solved</h3>
+              <p className="text-sm text-gray-600 mb-4">Award points to the person who solved this issue.</p>
+              <button
+                onClick={() => setShowSolveModal(true)}
+                className="btn btn-success btn-md w-full"
+              >
+                <CheckCircle size={16} className="mr-2" />
+                Mark as Solved
+              </button>
             </div>
           )}
           {/* Status and Priority */}
@@ -479,6 +577,31 @@ const IssueDetail = () => {
                   </div>
                 </div>
               )}
+
+              {issue.resolution?.solvedBy && (
+                <div className="flex items-start space-x-3">
+                  <div className="w-8 h-8 bg-yellow-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <CheckCircle size={14} className="text-yellow-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-gray-900">
+                      {issue.resolution.solvedBy._id === issue.postedBy._id 
+                        ? `Solved by ${issue.resolution.solvedBy.firstName} ${issue.resolution.solvedBy.lastName} (self)`
+                        : `Solved by ${issue.resolution.solvedBy.firstName} ${issue.resolution.solvedBy.lastName}`
+                      }
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {issue.resolution.solvedBy.employeeId} 
+                      {issue.resolution.pointsAwarded > 0 && ` • ${issue.resolution.pointsAwarded} points awarded`}
+                    </p>
+                    {issue.resolution.solvedAt && (
+                      <p className="text-xs text-gray-400">
+                        {formatDistanceToNow(new Date(issue.resolution.solvedAt), { addSuffix: true })}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -539,6 +662,117 @@ const IssueDetail = () => {
           )}
         </div>
       </div>
+
+      {/* Mark as Solved Modal */}
+      {showSolveModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setShowSolveModal(false)}></div>
+          <div className="relative w-full max-w-md card p-6 z-51">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Mark Issue as Solved</h3>
+            
+            <div className="space-y-4">
+              {/* Solver Selection */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Who solved this issue?
+                </label>
+                <select
+                  value={solveData.solvedBy}
+                  onChange={(e) => {
+                    const selectedValue = e.target.value;
+                    setSolveData({ 
+                      ...solveData, 
+                      solvedBy: selectedValue,
+                      pointsAwarded: selectedValue === 'self' ? 0 : solveData.pointsAwarded
+                    });
+                  }}
+                  className="input w-full"
+                  required
+                >
+                  <option value="">Select a solver...</option>
+                  <option value="self">Solved myself (no points)</option>
+                  {helpers.length > 0 ? (
+                    helpers.map((helper) => (
+                      <option key={helper._id} value={helper._id}>
+                        {helper.firstName || 'Unknown'} {helper.lastName || 'User'} 
+                        {helper.employeeId && ` (${helper.employeeId})`}
+                        {helper.department && ` - ${helper.department}`}
+                      </option>
+                    ))
+                  ) : (
+                    <option value="" disabled>No other users available</option>
+                  )}
+                </select>
+                {helpers.length === 0 && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    No other users found. You can still mark as solved by yourself.
+                  </p>
+                )}
+              </div>
+
+              {/* Solution Description */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Solution Description
+                </label>
+                <textarea
+                  value={solveData.solution}
+                  onChange={(e) => setSolveData({ ...solveData, solution: e.target.value })}
+                  placeholder="Describe how the issue was resolved... (optional)"
+                  className="input w-full h-24 resize-none"
+                />
+              </div>
+
+              {/* Points Awarded */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Points to Award
+                </label>
+                <div className="flex items-center space-x-2">
+                  <Star size={16} className="text-yellow-500" />
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={solveData.pointsAwarded}
+                    onChange={(e) => setSolveData({ ...solveData, pointsAwarded: parseInt(e.target.value) || 0 })}
+                    className={`input w-20 ${solveData.solvedBy === 'self' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                    disabled={solveData.solvedBy === 'self'}
+                  />
+                  <span className="text-sm text-gray-500">points</span>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  {solveData.solvedBy === 'self' 
+                    ? 'No points awarded when solving your own issue'
+                    : 'Higher points for more complex or urgent issues'
+                  }
+                </p>
+              </div>
+            </div>
+
+            <div className="flex justify-end space-x-3 mt-6">
+              <button
+                onClick={() => setShowSolveModal(false)}
+                className="btn btn-secondary btn-md"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleMarkAsSolved}
+                disabled={solving || !solveData.solvedBy}
+                className="btn btn-success btn-md"
+              >
+                {solving ? (
+                  <div className="loading-spinner w-4 h-4 mr-2"></div>
+                ) : (
+                  <CheckCircle size={16} className="mr-2" />
+                )}
+                {solving ? 'Marking...' : 'Mark as Solved'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

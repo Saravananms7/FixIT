@@ -14,7 +14,9 @@ import {
   Plus,
   TrendingUp,
   Activity,
-  FileText
+  FileText,
+  UserCircle,
+  ChevronDown
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationsContext';
@@ -23,11 +25,12 @@ import { issuesAPI } from '../../services/api';
 const DashboardLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { user, logout } = useAuth();
-  const { notifications, unread, markAllRead } = useNotifications();
+  const { notifications, unread, markAllRead, respondToHelp } = useNotifications();
   const [showNotif, setShowNotif] = useState(false);
   const [selectedNotif, setSelectedNotif] = useState(null);
   const [selectedIssue, setSelectedIssue] = useState(null);
   const [loadingIssue, setLoadingIssue] = useState(false);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
   const location = useLocation();
 
   const navigation = [
@@ -59,6 +62,23 @@ const DashboardLayout = () => {
     };
     loadIssue();
   }, [selectedNotif]);
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showProfileMenu && !event.target.closest('.profile-menu-container')) {
+        setShowProfileMenu(false);
+      }
+      if (showNotif && !event.target.closest('.notification-container')) {
+        setShowNotif(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showProfileMenu, showNotif]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 relative">
@@ -192,7 +212,7 @@ const DashboardLayout = () => {
               </Link>
 
               {/* Notifications */}
-              <div className="relative">
+              <div className="relative notification-container">
                 <button
                   onClick={() => { setShowNotif((s) => !s); markAllRead(); }}
                   className="relative p-3 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all duration-200"
@@ -207,15 +227,45 @@ const DashboardLayout = () => {
                       {notifications.length === 0 ? (
                         <div className="p-4 text-sm text-gray-500">No notifications</div>
                       ) : notifications.map((n) => (
-                        <button 
-                          key={n.id} 
-                          className="block w-full text-left p-3 hover:bg-gray-50"
-                          onClick={() => { setSelectedNotif(n); setShowNotif(false); }}
-                        >
-                          <p className="text-sm font-medium text-gray-900">{n.title}</p>
-                          <p className="text-xs text-gray-600">{n.message}</p>
-                          <p className="text-[10px] text-gray-400 mt-1">{new Date(n.createdAt).toLocaleString()}</p>
-                        </button>
+                        <div key={n.id} className={`block w-full text-left p-3 hover:bg-gray-50 ${n.meta?.status === 'accepted' ? 'bg-green-50' : n.meta?.status === 'declined' ? 'bg-red-50' : ''}`}>
+                          <button
+                            className="w-full text-left"
+                            onClick={() => { setSelectedNotif(n); setShowNotif(false); }}
+                          >
+                            <p className="text-sm font-medium text-gray-900">{n.title}</p>
+                            <p className="text-xs text-gray-600">
+                              {n.message}
+                              {n.type === 'help:request' && n.meta?.status && (
+                                <span className={`ml-2 inline-block text-[10px] px-2 py-0.5 rounded-full ${n.meta.status === 'accepted' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                  {n.meta.status}
+                                </span>
+                              )}
+                            </p>
+                            <p className="text[10px] text-gray-400 mt-1">{new Date(n.createdAt).toLocaleString()}</p>
+                          </button>
+                          {n.type === 'help:request' && !n.meta?.status && (
+                            <div className="mt-2 flex gap-2">
+                              <button
+                                className="btn btn-primary btn-xs"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  respondToHelp(n.data.from.id, n.data.issueId, true);
+                                }}
+                              >
+                                Accept
+                              </button>
+                              <button
+                                className="btn btn-secondary btn-xs"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  respondToHelp(n.data.from.id, n.data.issueId, false);
+                                }}
+                              >
+                                Decline
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       ))}
                     </div>
                   </div>
@@ -223,15 +273,67 @@ const DashboardLayout = () => {
               </div>
 
               {/* User menu */}
-              <div className="relative">
-                <button className="flex items-center space-x-3 p-2 rounded-xl hover:bg-gray-100 transition-all duration-200">
+              <div className="relative profile-menu-container">
+                <button 
+                  onClick={() => setShowProfileMenu(!showProfileMenu)}
+                  className="flex items-center space-x-3 p-2 rounded-xl hover:bg-gray-100 transition-all duration-200"
+                >
                   <div className="w-10 h-10 bg-gradient-to-br from-primary-100 to-primary-200 rounded-xl flex items-center justify-center shadow-sm">
                     <User size={18} className="text-primary-600" />
                   </div>
-                  <span className="hidden sm:block text-sm font-medium text-gray-700">
-                    {user?.firstName}
-                  </span>
+                  <div className="hidden sm:block">
+                    <span className="text-sm font-medium text-gray-700">
+                      {user?.firstName}
+                    </span>
+                    <ChevronDown size={14} className="text-gray-400 ml-1 inline" />
+                  </div>
                 </button>
+                
+                {/* Profile dropdown menu */}
+                {showProfileMenu && (
+                  <div className="absolute right-0 mt-2 w-64 card p-2 z-[400]">
+                    <div className="px-3 py-2 border-b border-gray-100">
+                      <p className="text-sm font-semibold text-gray-900">
+                        {user?.firstName} {user?.lastName}
+                      </p>
+                      <p className="text-xs text-gray-500">{user?.email}</p>
+                      <p className="text-xs text-gray-500">{user?.position}</p>
+                    </div>
+                    
+                    <div className="py-1">
+                      <Link
+                        to="/profile"
+                        className="flex items-center px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
+                        onClick={() => setShowProfileMenu(false)}
+                      >
+                        <UserCircle size={16} className="mr-3 text-gray-400" />
+                        View Profile
+                      </Link>
+                      
+                      <Link
+                        to="/settings"
+                        className="flex items-center px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
+                        onClick={() => setShowProfileMenu(false)}
+                      >
+                        <Settings size={16} className="mr-3 text-gray-400" />
+                        Settings
+                      </Link>
+                      
+                      <div className="border-t border-gray-100 my-1"></div>
+                      
+                      <button
+                        onClick={() => {
+                          setShowProfileMenu(false);
+                          logout();
+                        }}
+                        className="flex items-center w-full px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      >
+                        <LogOut size={16} className="mr-3" />
+                        Sign Out
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -303,6 +405,30 @@ const DashboardLayout = () => {
                     <p className="text-sm font-semibold text-gray-900">{selectedNotif.data.sender.name}</p>
                     <p className="text-xs text-gray-600">Employee ID: {selectedNotif.data.sender.employeeId || '—'}</p>
                   </div>
+                </div>
+              )}
+
+              {/* Accept / Decline for help requests (inside modal after viewing) */}
+              {selectedNotif?.type === 'help:request' && !selectedNotif?.meta?.status && selectedNotif?.data?.from?.id && selectedNotif?.data?.issueId && (
+                <div className="mt-4 flex items-center justify-end gap-2">
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => {
+                      respondToHelp(selectedNotif.data.from.id, selectedNotif.data.issueId, false);
+                      setSelectedNotif(null);
+                    }}
+                  >
+                    Decline
+                  </button>
+                  <button
+                    className="btn btn-primary btn-sm"
+                    onClick={() => {
+                      respondToHelp(selectedNotif.data.from.id, selectedNotif.data.issueId, true);
+                      setSelectedNotif(null);
+                    }}
+                  >
+                    Accept
+                  </button>
                 </div>
               )}
             </div>

@@ -38,14 +38,45 @@ export const NotificationsProvider = ({ children }) => {
       });
     };
 
+    const handleHelpRequest = (payload) => {
+      console.debug('[socket] help:request received', payload);
+      pushNotification({
+        type: 'help:request',
+        title: 'Help Requested',
+        message: `${payload?.from?.name || 'A user'} is asking for help`,
+        data: payload,
+      });
+    };
+
+    const handleHelpResponse = (payload) => {
+      console.debug('[socket] help:response received', payload);
+      pushNotification({
+        type: 'help:response',
+        title: payload?.accepted ? 'Help Accepted' : 'Help Declined',
+        message: `${payload?.from?.name || 'User'} ${payload?.accepted ? 'accepted' : 'declined'} your help request`,
+        data: payload,
+      });
+      // mark matching help:request as responded
+      setNotifications((prev) => prev.map((n) => {
+        if (n.type === 'help:request' && n?.data?.from?.id === payload?.from?.id && n?.data?.issueId === payload?.issueId) {
+          return { ...n, meta: { ...(n.meta || {}), status: payload?.accepted ? 'accepted' : 'declined' }, read: true };
+        }
+        return n;
+      }));
+    };
+
     socket.on('issue:assigned', handleAssigned);
     socket.on('message:received', handleMessage);
     socket.on('help:offer', handleHelpOffer);
+    socket.on('help:request', handleHelpRequest);
+    socket.on('help:response', handleHelpResponse);
 
     return () => {
       socket.off('issue:assigned', handleAssigned);
       socket.off('message:received', handleMessage);
       socket.off('help:offer', handleHelpOffer);
+      socket.off('help:request', handleHelpRequest);
+      socket.off('help:response', handleHelpResponse);
     };
   }, [socket]);
 
@@ -54,12 +85,25 @@ export const NotificationsProvider = ({ children }) => {
     setUnread((u) => u + 1);
   };
 
+  // Helper to emit respond via socket from UI components that consume this context
+  const respondToHelp = (toUserId, issueId, accepted, note) => {
+    if (!socket) return;
+    socket.emit('help:respond', { toUserId, issueId, accepted, note });
+    // optimistic UI update on the pending request if present
+    setNotifications((prev) => prev.map((n) => {
+      if (n.type === 'help:request' && n?.data?.from?.id === toUserId && n?.data?.issueId === issueId) {
+        return { ...n, meta: { ...(n.meta || {}), status: accepted ? 'accepted' : 'declined' }, read: true };
+      }
+      return n;
+    }));
+  };
+
   const markAllRead = () => {
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
     setUnread(0);
   };
 
-  const value = useMemo(() => ({ notifications, unread, pushNotification, markAllRead }), [notifications, unread]);
+  const value = useMemo(() => ({ notifications, unread, pushNotification, markAllRead, respondToHelp }), [notifications, unread]);
   return <NotificationsContext.Provider value={value}>{children}</NotificationsContext.Provider>;
 };
 

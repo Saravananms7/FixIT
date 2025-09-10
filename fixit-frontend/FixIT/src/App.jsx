@@ -14,6 +14,7 @@ import EditIssue from './pages/Issues/EditIssue';
 import MyIssues from './pages/Issues/MyIssues';
 import Users from './pages/Users/Users';
 import UserProfile from './pages/Users/UserProfile';
+import Profile from './pages/Profile/Profile';
 import Settings from './pages/Settings/Settings';
 
 // Protected Route Component
@@ -76,6 +77,7 @@ const AppRoutes = () => {
         <Route path="my-issues" element={<MyIssues />} />
         <Route path="users" element={<Users />} />
         <Route path="users/:id" element={<UserProfile />} />
+        <Route path="profile" element={<Profile />} />
         <Route path="settings" element={<Settings />} />
       </Route>
       

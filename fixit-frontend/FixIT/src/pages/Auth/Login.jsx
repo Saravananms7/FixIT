@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, Mail, Lock, User, Shield, Zap } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, User, Zap } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
 const Login = () => {
@@ -134,25 +134,6 @@ const Login = () => {
               </button>
             </div>
 
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-200"></div>
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-white text-gray-500">Demo Account</span>
-              </div>
-            </div>
-
-            <div className="bg-gradient-to-r from-primary-50 to-primary-100 rounded-xl p-4 border border-primary-200">
-              <div className="flex items-center mb-2">
-                <Shield className="w-4 h-4 text-primary-600 mr-2" />
-                <span className="text-sm font-semibold text-primary-800">Demo Credentials</span>
-              </div>
-              <div className="text-sm text-primary-700 space-y-1">
-                <p><span className="font-medium">Email:</span> john.doe@company.com</p>
-                <p><span className="font-medium">Password:</span> password123</p>
-              </div>
-            </div>
           </form>
         </div>
 

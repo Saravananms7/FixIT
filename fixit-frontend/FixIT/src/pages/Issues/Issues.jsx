@@ -23,6 +23,7 @@ const Issues = () => {
   const [issues, setIssues] = useState([]);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(null);
+  const [activeTab, setActiveTab] = useState('active'); // 'active' | 'resolved' | 'all'
   const [filters, setFilters] = useState({
     status: '',
     priority: '',
@@ -32,7 +33,7 @@ const Issues = () => {
 
   useEffect(() => {
     fetchIssues();
-  }, [filters]);
+  }, [filters, activeTab]);
 
   const fetchIssues = async () => {
     try {
@@ -40,7 +41,9 @@ const Issues = () => {
       // Exclude current user's issues from "All Issues" page
       const params = {
         ...filters,
-        excludePostedBy: user?._id // This will exclude current user's issues
+        // Force status=resolved when on Resolved tab; otherwise let filters/status work normally
+        status: activeTab === 'resolved' ? 'resolved' : '',
+        excludePostedBy: user?._id
       };
       const response = await issuesAPI.getAll(params);
       setIssues(response.data.data);
@@ -113,6 +116,11 @@ const Issues = () => {
     return status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
   };
 
+  // Compute list to display based on tab
+  const displayIssues = activeTab === 'active'
+    ? issues.filter(i => i.status !== 'resolved' && i.status !== 'closed')
+    : issues; // resolved/all use fetched list (resolved fetch is already filtered)
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -136,6 +144,22 @@ const Issues = () => {
           <Plus size={16} className="mr-2" />
           New Issue
         </Link>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => setActiveTab('active')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium border ${activeTab === 'active' ? 'bg-primary-600 text-white border-primary-600' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'}`}
+        >
+          Active
+        </button>
+        <button
+          onClick={() => setActiveTab('resolved')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium border ${activeTab === 'resolved' ? 'bg-primary-600 text-white border-primary-600' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'}`}
+        >
+          Resolved
+        </button>
       </div>
 
       {/* Filters */}
@@ -167,6 +191,7 @@ const Issues = () => {
               value={filters.status}
               onChange={(e) => handleFilterChange('status', e.target.value)}
               className="input"
+              disabled={activeTab === 'resolved'}
             >
               <option value="">All Status</option>
               <option value="open">Open</option>
@@ -175,6 +200,9 @@ const Issues = () => {
               <option value="resolved">Resolved</option>
               <option value="closed">Closed</option>
             </select>
+            {activeTab === 'resolved' && (
+              <p className="text-[11px] text-gray-500 mt-1">Status locked to Resolved</p>
+            )}
           </div>
 
           {/* Priority Filter */}
@@ -220,16 +248,16 @@ const Issues = () => {
 
       {/* Issues List */}
       <div className="space-y-4">
-        {issues.length === 0 ? (
+        {displayIssues.length === 0 ? (
           <div className="text-center py-12">
             <AlertTriangle className="mx-auto h-12 w-12 text-gray-400" />
-            <h3 className="mt-2 text-sm font-medium text-gray-900">No issues found</h3>
+            <h3 className="mt-2 text-sm font-medium text-gray-900">No {activeTab === 'resolved' ? 'resolved ' : ''}issues found</h3>
             <p className="mt-1 text-sm text-gray-500">
               {filters.search || filters.status || filters.priority || filters.category
                 ? 'Try adjusting your filters'
-                : 'Get started by creating a new issue'}
+                : activeTab === 'resolved' ? 'No issues have been resolved yet' : 'Get started by creating a new issue'}
             </p>
-            {!filters.search && !filters.status && !filters.priority && !filters.category && (
+            {activeTab !== 'resolved' && !filters.search && !filters.status && !filters.priority && !filters.category && (
               <div className="mt-6">
                 <Link
                   to="/issues/new"
@@ -242,7 +270,7 @@ const Issues = () => {
             )}
           </div>
         ) : (
-          issues.map((issue) => (
+          displayIssues.map((issue) => (
             <div key={issue._id} className="card p-6 hover:shadow-md transition-shadow">
               <div className="flex items-start justify-between">
                 <div className="flex-1 min-w-0">

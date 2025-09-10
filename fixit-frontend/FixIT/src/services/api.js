@@ -59,6 +59,7 @@ export const issuesAPI = {
   assign: (id, assignedTo) => api.put(`/issues/${id}/assign`, { assignedTo }),
   addComment: (id, commentData) => api.post(`/issues/${id}/comments`, commentData),
   resolve: (id, resolutionData) => api.put(`/issues/${id}/resolve`, resolutionData),
+  markAsSolved: (id, solveData) => api.put(`/issues/${id}/solve`, solveData),
   vote: (id, voteType) => api.post(`/issues/${id}/vote`, { voteType }),
 };
 
@@ -67,6 +68,7 @@ export const usersAPI = {
   getAll: (params = {}) => api.get('/users', { params }),
   getById: (id) => api.get(`/users/${id}`),
   getUserIssues: (id, params = {}) => api.get(`/users/${id}/issues`, { params }),
+  updateProfile: (profileData) => api.put('/users/profile', profileData),
   updateSkills: (id, skills) => api.put(`/users/${id}/skills`, { skills }),
   verifySkill: (id, skillName) => api.put(`/users/${id}/skills/${skillName}/verify`),
   getStats: (id) => api.get(`/users/${id}/stats`),
